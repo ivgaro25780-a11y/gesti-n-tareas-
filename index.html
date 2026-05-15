@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BAUHAUS - Gestión de Tareas</title>
+    <!-- Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React y Babel para ejecutar JSX en el navegador -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-bauhaus {
+            font-family: 'Archivo Black', 'Arial Black', sans-serif;
+            letter-spacing: -0.02em;
+        }
+        /* Ocultar scrollbar en Chrome/Safari */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body class="bg-neutral-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Componentes de Iconos SVG (Reemplazo de Lucide para portabilidad total)
+        const Icons = {
+            Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+            Tasks: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Logout: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+            Mail: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        };
+
+        const BauhausLogo = () => (
+            <div className="flex gap-0.5">
+                {['B', 'A', 'U', 'H', 'A', 'U', 'S'].map((char, i) => (
+                    <div key={i} className="bg-[#e30613] text-white w-8 h-8 flex items-center justify-center font-black text-xl relative font-bauhaus">
+                        {char}
+                        {char === 'S' && <span className="absolute top-0.5 right-0.5 text-[5px]">®</span>}
+                    </div>
+                ))}
+            </div>
+        );
+
+        const App = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [tasks, setTasks] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [view, setView] = useState('dashboard');
+            const [isCreatingUser, setIsCreatingUser] = useState(false);
+            const [confirmDelete, setConfirmDelete] = useState(null);
+
+            // Cargar datos locales
+            useEffect(() => {
+                const savedTasks = localStorage.getItem('bh_tasks_local');
+                const savedUsers = localStorage.getItem('bh_users_local');
+                
+                if (savedTasks) setTasks(JSON.parse(savedTasks));
+                else setTasks([{ id: 't1', title: 'Ejemplo: Revisión Pasillo 4', description: 'Revisar anclajes.', createdAt: '2024-05-15', estimatedTime: '1h', assignedTo: 'mantenimiento', status: 'pending' }]);
+
+                if (savedUsers) setUsers(JSON.parse(savedUsers));
+                else setUsers([
+                    { id: 'u1', name: 'Admin Barcelona', role: 'admin', email: 'dirbarcelona@bauhaus.es', position: 'ADMINISTRADOR' },
+                    { id: 'u2', name: 'Operario Ejemplo', role: 'user', email: 'staff@bauhaus.es', position: 'Responsable de seccion' }
+                ]);
+            }, []);
+
+            // Guardar cambios
+            useEffect(() => { localStorage.setItem('bh_tasks_local', JSON.stringify(tasks)); }, [tasks]);
+            useEffect(() => { localStorage.setItem('bh_users_local', JSON.stringify(users)); }, [users]);
+
+            const addTask = (taskData) => {
+                const newTask = { ...taskData, id: `t${Date.now()}`, status: 'pending' };
+                setTasks([newTask, ...tasks]);
+                setView('tasks');
+            };
+
+            const deleteTask = (id) => {
+                setTasks(tasks.filter(t => t.id !== id));
+                setConfirmDelete(null);
+            };
+
+            const stats = {
+                pending: tasks.filter(t => t.status === 'pending').length,
+                inProgress: tasks.filter(t => t.status === 'in-progress').length,
+                completed: tasks.filter(t => t.status === 'completed').length,
+                total: tasks.length
+            };
+
+            const reportBody = tasks.filter(t => t.status !== 'completed').map(t => `- ${t.title}`).join('%0D%0A');
+            const mailto = `mailto:dirbarcelona@bauhaus.es?subject=Reporte de Tareas&body=Tareas pendientes:%0D%0A${reportBody}`;
+
+            if (!currentUser) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-neutral-100 p-4">
+                        <div className="max-w-md w-full bg-white border-[6px] border-black p-10 shadow-[20px_20px_0px_0px_rgba(0,0,0,1)]">
+                            <div className="flex flex-col items-center mb-10">
+                                <BauhausLogo />
+                                <div className="h-1.5 w-full bg-black my-6"></div>
+                                <h2 className="font-bauhaus text-xl uppercase">Gestión de Tareas</h2>
+                            </div>
+                            <div className="space-y-3">
+                                {users.map(u => (
+                                    <button key={u.id} onClick={() => setCurrentUser(u)} className="w-full p-4 border-4 border-black hover:bg-black hover:text-white flex justify-between items-center transition-all">
+                                        <div className="text-left">
+                                            <p className="font-bauhaus text-sm uppercase">{u.name}</p>
+                                            <p className="text-[9px] font-bold opacity-50 uppercase">{u.role === 'admin' ? 'ADMINISTRADOR' : u.position}</p>
+                                        </div>
+                                        <span>→</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col md:flex-row min-h-screen">
+                    {/* Sidebar */}
+                    <nav className="w-full md:w-64 bg-black text-white p-6 flex flex-col shrink-0">
+                        <div className="bg-white p-4 mb-10 flex justify-center border-b-4 border-black">
+                            <BauhausLogo />
+                        </div>
+                        <div className="flex-grow space-y-2">
+                            <button onClick={() => setView('dashboard')} className={`w-full text-left p-3 flex items-center gap-3 font-bauhaus text-[10px] uppercase border-l-4 ${view==='dashboard'?'border-[#e30613] bg-zinc-800':'border-transparent text-zinc-500'}`}>
+                                <Icons.Dashboard /> Dashboard
+                            </button>
+                            <button onClick={() => setView('tasks')} className={`w-full text-left p-3 flex items-center gap-3 font-bauhaus text-[10px] uppercase border-l-4 ${view==='tasks'?'border-[#e30613] bg-zinc-800':'border-transparent text-zinc-500'}`}>
+                                <Icons.Tasks /> Backlog de tareas
+                            </button>
+                            <button onClick={() => setView('create')} className={`w-full text-left p-3 flex items-center gap-3 font-bauhaus text-[10px] uppercase border-l-4 ${view==='create'?'border-[#e30613] bg-zinc-800':'border-transparent text-zinc-500'}`}>
+                                <Icons.Plus /> Nueva Solicitud
+                            </button>
+                            {currentUser.role === 'admin' && (
+                                <button onClick={() => setView('users')} className={`w-full text-left p-3 flex items-center gap-3 font-bauhaus text-[10px] uppercase border-l-4 ${view==='users'?'border-[#e30613] bg-zinc-800':'border-transparent text-zinc-500'}`}>
+                                    <Icons.Users /> Personal
+                                </button>
+                            )}
+                        </div>
+                        <div className="mt-10 border-t border-zinc-800 pt-6">
+                            <p className="font-bauhaus text-[9px] uppercase text-[#e30613]">{currentUser.role === 'admin' ? 'ADMINISTRADOR' : currentUser.position}</p>
+                            <p className="font-bauhaus text-[10px] truncate mb-4">{currentUser.name}</p>
+                            {currentUser.role === 'admin' && (
+                                <a href={mailto} className="flex items-center gap-2 text-[8px] text-zinc-500 hover:text-white mb-6 uppercase border border-zinc-700 p-2">
+                                    <Icons.Mail /> Enviar Reporte
+                                </a>
+                            )}
+                            <button onClick={() => setCurrentUser(null)} className="w-full p-2 bg-white text-black font-bauhaus text-[9px] uppercase border-2 border-black hover:bg-[#e30613] hover:text-white transition-colors">
+                                Salir
+                            </button>
+                        </div>
+                    </nav>
+
+                    {/* Content */}
+                    <main className="flex-grow p-8 md:p-12">
+                        <h1 className="font-bauhaus text-5xl uppercase mb-12 border-b-8 border-black pb-4">
+                            {view === 'dashboard' ? 'Dashboard' : view === 'tasks' ? 'Backlog' : view === 'users' ? 'Personal' : 'Nueva Orden'}
+                        </h1>
+
+                        {view === 'dashboard' && (
+                            <div className="bg-white border-4 border-black p-8 shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] max-w-2xl">
+                                <h3 className="font-bauhaus text-xl uppercase mb-8">Estado de Tareas</h3>
+                                <div className="space-y-8">
+                                    {[
+                                        { label: 'Pendientes', count: stats.pending, color: 'bg-black' },
+                                        { label: 'En Proceso', count: stats.inProgress, color: 'bg-[#e30613]' },
+                                        { label: 'Finalizadas', count: stats.completed, color: 'bg-emerald-500' }
+                                    ].map(item => (
+                                        <div key={item.label} className="space-y-2">
+                                            <div className="flex justify-between font-bauhaus text-[10px] uppercase">
+                                                <span>{item.label}</span>
+                                                <span className="text-2xl">{item.count}</span>
+                                            </div>
+                                            <div className="h-8 bg-zinc-100 border-2 border-black relative">
+                                                <div className={`h-full ${item.color} transition-all`} style={{width: `${stats.total ? (item.count/stats.total)*100 : 0}%`}}></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'tasks' && (
+                            <div className="bg-white border-4 border-black overflow-hidden shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]">
+                                <table className="w-full text-left">
+                                    <thead className="bg-black text-white font-bauhaus text-[10px] uppercase">
+                                        <tr>
+                                            <th className="p-4">Tarea</th>
+                                            <th className="p-4">Asignado</th>
+                                            <th className="p-4">Estado</th>
+                                            <th className="p-4 text-right">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y-2 divide-zinc-100">
+                                        {tasks.map(t => (
+                                            <tr key={t.id} className="text-[10px] font-bold uppercase">
+                                                <td className="p-4">
+                                                    <p className="font-bauhaus">{t.title}</p>
+                                                    <p className="text-zinc-400 text-[8px]">{t.createdAt}</p>
+                                                </td>
+                                                <td className="p-4 text-[#e30613]">{t.assignedTo}</td>
+                                                <td className="p-4">
+                                                    <span className={`px-2 py-1 ${t.status==='completed'?'bg-emerald-100 text-emerald-600':'bg-amber-100 text-amber-600'}`}>{t.status}</span>
+                                                </td>
+                                                <td className="p-4 text-right flex justify-end gap-2">
+                                                    {t.status !== 'completed' && (
+                                                        <button onClick={() => setTasks(tasks.map(x => x.id===t.id?{...x,status:'completed'}:x))} className="bg-emerald-500 text-white p-1 border-2 border-black px-3">OK</button>
+                                                    )}
+                                                    {currentUser.role === 'admin' && (
+                                                        <button onClick={() => setConfirmDelete(t.id)} className="p-1 border-2 border-black text-zinc-300 hover:text-[#e30613] hover:border-[#e30613]"><Icons.Trash /></button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {view === 'create' && (
+                            <div className="max-w-md bg-white border-4 border-black p-8 shadow-[15px_15px_0px_0px_rgba(0,0,0,1)]">
+                                <form className="space-y-4" onSubmit={e => {
+                                    e.preventDefault();
+                                    const fd = new FormData(e.target);
+                                    addTask({
+                                        title: fd.get('title'),
+                                        createdAt: fd.get('date'),
+                                        estimatedTime: fd.get('time'),
+                                        assignedTo: fd.get('to')
+                                    });
+                                }}>
+                                    <div>
+                                        <label className="font-bauhaus text-[9px] uppercase block mb-1">Título</label>
+                                        <input name="title" required className="w-full p-3 border-2 border-black uppercase text-xs font-bold" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="font-bauhaus text-[9px] uppercase block mb-1">Fecha</label>
+                                            <input type="date" name="date" required className="w-full p-3 border-2 border-black text-xs" />
+                                        </div>
+                                        <div>
+                                            <label className="font-bauhaus text-[9px] uppercase block mb-1">Tiempo</label>
+                                            <input name="time" placeholder="2h" required className="w-full p-3 border-2 border-black text-xs" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="font-bauhaus text-[9px] uppercase block mb-1">Asignar a</label>
+                                        <select name="to" className="w-full p-3 border-2 border-black uppercase text-xs font-bold bg-white">
+                                            <option>SECCIÓN</option>
+                                            <option>MANTENIMIENTO</option>
+                                            <option>PROVEEDOR</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" className="w-full bg-[#e30613] text-white p-4 font-bauhaus uppercase text-xs border-2 border-black hover:bg-black transition-colors mt-4">Guardar Orden</button>
+                                </form>
+                            </div>
+                        )}
+
+                        {view === 'users' && currentUser.role === 'admin' && (
+                            <div className="space-y-6">
+                                <button onClick={() => setIsCreatingUser(true)} className="bg-black text-white p-4 px-8 font-bauhaus uppercase text-xs border-4 border-black hover:bg-[#e30613]">Nuevo Usuario</button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {users.map(u => (
+                                        <div key={u.id} className="bg-white border-4 border-black p-4 relative shadow-[5px_5px_0px_0px_rgba(0,0,0,1)]">
+                                            <p className="font-bauhaus text-xs uppercase">{u.name}</p>
+                                            <p className="text-[#e30613] text-[9px] font-bold uppercase">{u.position}</p>
+                                            {u.id !== currentUser.id && (
+                                                <button onClick={() => setUsers(users.filter(x => x.id !== u.id))} className="absolute top-4 right-4 text-zinc-300 hover:text-[#e30613]"><Icons.Trash /></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modales */}
+                    {confirmDelete && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white border-8 border-[#e30613] p-10 max-w-xs w-full text-center">
+                                <h4 className="font-bauhaus text-xl uppercase mb-6">¿Borrar?</h4>
+                                <button onClick={() => deleteTask(confirmDelete)} className="w-full bg-[#e30613] text-white p-4 font-bauhaus uppercase text-xs mb-2">Eliminar</button>
+                                <button onClick={() => setConfirmDelete(null)} className="w-full text-zinc-400 font-bauhaus uppercase text-[9px] py-2">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isCreatingUser && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white border-4 border-black p-8 max-w-sm w-full">
+                                <h4 className="font-bauhaus text-xl uppercase mb-6">Nuevo Perfil</h4>
+                                <form className="space-y-4" onSubmit={e => {
+                                    e.preventDefault();
+                                    const fd = new FormData(e.target);
+                                    const newUser = { id: Date.now().toString(), name: fd.get('n'), position: fd.get('p'), role: fd.get('r'), email: 'staff@bauhaus.es' };
+                                    setUsers([...users, newUser]);
+                                    setIsCreatingUser(false);
+                                }}>
+                                    <input name="n" placeholder="NOMBRE" required className="w-full p-3 border-2 border-black font-bold text-xs" />
+                                    <select name="p" className="w-full p-3 border-2 border-black text-xs uppercase font-bold bg-white">
+                                        <option>Adjunto de comercio</option>
+                                        <option>Adjunto de gestion</option>
+                                        <option>Responsable de seccion</option>
+                                        <option>2º responsable</option>
+                                        <option>ADMINISTRADOR</option>
+                                    </select>
+                                    <select name="r" className="w-full p-3 border-2 border-black text-xs uppercase font-bold bg-white">
+                                        <option value="user">OPERARIO</option>
+                                        <option value="admin">ADMINISTRADOR</option>
+                                    </select>
+                                    <button type="submit" className="w-full bg-black text-white p-4 font-bauhaus uppercase text-xs">Crear</button>
+                                    <button type="button" onClick={() => setIsCreatingUser(false)} className="w-full text-zinc-400 font-bauhaus uppercase text-[9px] py-2">Cerrar</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
